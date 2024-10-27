@@ -1,84 +1,121 @@
 package io.github.vvb2060.keyattestation.attestation;
 
-import android.os.Build;
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.util.Log;
+
+import androidx.annotation.NonNull;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.util.Locale;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 import io.github.vvb2060.keyattestation.AppApplication;
 import io.github.vvb2060.keyattestation.R;
 
 public record RevocationList(String status, String reason) {
-    private static final JSONObject data = getStatus();
+    private static final JSONObject data = loadData();
 
-    private static String toString(InputStream input) throws IOException {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
-        } else {
-            var output = new ByteArrayOutputStream(8192);
-            var buffer = new byte[8192];
-            for (int length; (length = input.read(buffer)) != -1; ) {
-                output.write(buffer, 0, length);
-            }
-            return output.toString();
+    private static JSONObject loadData() {
+        if (!isConnectedToInternet()) {
+            return getJsonFromResource();
         }
-    }
-
-    private static JSONObject parseStatus(InputStream inputStream) throws IOException {
         try {
-            var statusListJson = new JSONObject(toString(inputStream));
-            return statusListJson.getJSONObject("entries");
-        } catch (JSONException e) {
-            throw new IOException(e);
+            return getJsonFromUrl();
+        } catch (IOException | JSONException e) {
+            Log.e(AppApplication.TAG, "Error loading JSON from URL, trying local resource", e);
+            return getJsonFromResource();
         }
     }
 
-    private static JSONObject getStatus() {
-        var statusUrl = "https://android.googleapis.com/attestation/status";
-        var resName = "android:string/vendor_required_attestation_revocation_list_url";
-        var res = AppApplication.app.getResources();
-        // noinspection DiscouragedApi
-        var id = res.getIdentifier(resName, null, null);
-        if (id != 0) {
-            var url = res.getString(id);
-            if (!statusUrl.equals(url) && url.toLowerCase(Locale.ROOT).startsWith("https")) {
-                // no network permission, waiting for user report
-                throw new RuntimeException("unknown status url: " + url);
+    private static JSONObject getJsonFromResource() {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(AppApplication.app.getResources().openRawResource(R.raw.status)))) {
+            StringBuilder stringBuilder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                stringBuilder.append(line);
             }
+            Log.i(AppApplication.TAG, "Read " + stringBuilder.length() + " chars from local JSON");
+            return new JSONObject(stringBuilder.toString());
+        } catch (IOException | JSONException e) {
+            Log.wtf(AppApplication.TAG, "Error reading local JSON", e);
+            throw new RuntimeException("Unable to load JSON data", e);
         }
-        try (var input = res.openRawResource(R.raw.status)) {
-            return parseStatus(input);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to parse certificate revocation status", e);
+    }
+
+    private static JSONObject getJsonFromUrl() throws IOException, JSONException {
+        HttpURLConnection connection = getHttpURLConnection();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+            StringBuilder stringBuilder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                stringBuilder.append(line);
+            }
+            Log.i(AppApplication.TAG, "Read " + stringBuilder.length() + " chars from remote JSON");
+            return new JSONObject(stringBuilder.toString());
+        } finally {
+            connection.disconnect();
         }
+    }
+
+    @NonNull
+    private static HttpURLConnection getHttpURLConnection() throws IOException {
+        URL url = new URL("https://android.googleapis.com/attestation/status");
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+        connection.setUseCaches(false);
+        connection.setDefaultUseCaches(false);
+
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
+        connection.setRequestProperty("Pragma", "no-cache");
+        connection.setRequestProperty("Expires", "0");
+
+        return connection;
+    }
+
+    private static boolean isConnectedToInternet() {
+        ConnectivityManager connectivityManager = (ConnectivityManager) AppApplication.app.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivityManager == null) return false;
+
+        Network network = connectivityManager.getActiveNetwork();
+        if (network == null) return false;
+
+        NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
+        return capabilities != null &&
+                (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET));
     }
 
     public static RevocationList get(BigInteger serialNumber) {
-        String serialNumberString = serialNumber.toString(16).toLowerCase();
-        JSONObject revocationStatus;
+        String serialNumberHex = serialNumber.toString(16).toLowerCase();
         try {
-            revocationStatus = data.getJSONObject(serialNumberString);
+            JSONObject entries = data.getJSONObject("entries");
+            JSONObject revocationEntry = entries.optJSONObject(serialNumberHex);
+            if (revocationEntry != null) {
+                return new RevocationList(revocationEntry.getString("status"), revocationEntry.getString("reason"));
+            } else {
+                Log.i(AppApplication.TAG, "Serial number '" + serialNumber + "' not found in JSON");
+            }
         } catch (JSONException e) {
-            return null;
+            Log.wtf(AppApplication.TAG, "Error parsing JSON entries", e);
+            throw new RuntimeException("JSON structure unexpected", e);
         }
-        try {
-            var status = revocationStatus.getString("status");
-            var reason = revocationStatus.getString("reason");
-            return new RevocationList(status, reason);
-        } catch (JSONException e) {
-            return new RevocationList("", "");
-        }
+        return null;
     }
 
+    @NonNull
     @Override
     public String toString() {
-        return "status is " + status + ", reason is " + reason;
+        return "Status: " + status + ", Reason: " + reason;
     }
 }
