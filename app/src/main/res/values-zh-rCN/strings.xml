@@ -218,4 +218,5 @@
     <string name="knox_record_hash_description"><![CDATA[
     向 ICCC 请求完整性状态数据的 TA 的 SHA256 散列。
     ]]></string>
+    <string name="secret_mode">隐藏序列号</string>
 </resources>

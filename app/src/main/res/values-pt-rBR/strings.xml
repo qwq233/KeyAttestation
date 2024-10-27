@@ -284,4 +284,5 @@
     <string name="knox_record_hash_description"><![CDATA[
     um resumo SHA256 do TA solicitando os dados de status de integridade do ICCC.
     ]]></string>
+    <string name="secret_mode">Ocultar números de série</string>
 </resources>

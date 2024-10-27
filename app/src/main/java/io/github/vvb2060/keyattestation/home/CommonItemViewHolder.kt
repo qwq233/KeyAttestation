@@ -1,7 +1,9 @@
 package io.github.vvb2060.keyattestation.home
 
+import android.content.Context
 import android.view.View
 import androidx.core.view.isVisible
+import io.github.vvb2060.keyattestation.AppApplication
 import io.github.vvb2060.keyattestation.R
 import io.github.vvb2060.keyattestation.attestation.Attestation.KM_SECURITY_LEVEL_STRONG_BOX
 import io.github.vvb2060.keyattestation.attestation.Attestation.KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT
@@ -10,6 +12,9 @@ import io.github.vvb2060.keyattestation.attestation.CertificateInfo
 import io.github.vvb2060.keyattestation.databinding.HomeCommonItemBinding
 import rikka.core.res.resolveColorStateList
 import rikka.recyclerview.BaseViewHolder.Creator
+import java.util.Date
+import javax.security.auth.x500.X500Principal
+
 
 open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBinding) : HomeViewHolder<T, HomeCommonItemBinding>(itemView, binding) {
 
@@ -164,17 +169,33 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
                         listener.onCertInfoClick(data)
                     }
 
+                    val secretMode =
+                        AppApplication.app.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                            .getBoolean("secret_mode", true)
+
                     val sb = StringBuilder()
                     val cert = data.cert
                     val res = context.resources
                     sb.append(res.getString(R.string.cert_subject))
-                            .append(cert.subjectDN)
-                            .append("\n")
-                            .append(res.getString(R.string.cert_not_before))
-                            .append(AuthorizationList.formatDate(cert.notBefore))
-                            .append("\n")
-                            .append(res.getString(R.string.cert_not_after))
-                            .append(AuthorizationList.formatDate(cert.notAfter))
+                    if (secretMode) {
+                        sb.append(X500Principal("SERIALNUMBER=HIDDEN,T=TEE"))
+                    } else {
+                        sb.append(cert.subjectDN)
+                    }
+                    sb.append("\n")
+                        .append(res.getString(R.string.cert_not_before))
+                    if (secretMode) {
+                        sb.append(Date(0))
+                    } else {
+                        sb.append(AuthorizationList.formatDate(cert.notBefore))
+                    }
+                    sb.append("\n")
+                        .append(res.getString(R.string.cert_not_after))
+                    if (secretMode) {
+                        sb.append(Date())
+                    } else {
+                        sb.append(AuthorizationList.formatDate(cert.notAfter))
+                    }
 
                     if (data.certsIssued != null) {
                         sb.append("\n")

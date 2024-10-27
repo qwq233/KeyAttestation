@@ -159,4 +159,5 @@
     <string name="authorization_list_bootPatchLevel_description"><![CDATA[
     指定要使用此金鑰必須在裝置上安裝的核心映像安全性更新程式等級。此值以 YYYYMMDD 的形式顯示，表示系統安全性更新程式的日期。例如：如果金鑰在 Android 裝置上產生，且對應裝置安裝了系統於 2018 年 8 月 5 日提供的安全性更新程式，其值將表示為 20180805。
     ]]></string>
+    <string name="secret_mode">隱藏序號</string>
 </resources>

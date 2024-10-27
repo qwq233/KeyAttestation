@@ -5,7 +5,12 @@ import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.text.method.LinkMovementMethod
-import android.view.*
+import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
@@ -150,6 +155,11 @@ class HomeFragment : AppFragment(), HomeAdapter.Listener, MenuProvider {
     }
 
     override fun onPrepareMenu(menu: Menu) {
+        menu.findItem(R.id.menu_secret_mode).apply {
+            isVisible = true
+            isChecked = viewModel.secretMode
+        }
+
         menu.findItem(R.id.menu_use_sak).apply {
             isVisible = viewModel.hasSAK
             isChecked = viewModel.preferSAK
@@ -176,6 +186,13 @@ class HomeFragment : AppFragment(), HomeAdapter.Listener, MenuProvider {
 
     override fun onMenuItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.menu_secret_mode -> {
+                val status = !item.isChecked
+                item.isChecked = status
+                viewModel.secretMode = status
+                viewModel.load()
+            }
+
             R.id.menu_use_sak -> {
                 val status = !item.isChecked
                 item.isChecked = status

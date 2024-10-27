@@ -2,27 +2,35 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/menu_use_sak"
-        android:showAsAction="never"
+        android:id="@+id/menu_secret_mode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:checkable="true"
+        android:showAsAction="never"
+        android:title="@string/secret_mode" />
+
+    <item
+        android:id="@+id/menu_use_sak"
+        android:checkable="true"
+        android:showAsAction="never"
         android:title="@string/use_sak" />
 
     <item
         android:id="@+id/menu_use_strongbox"
-        android:showAsAction="never"
         android:checkable="true"
+        android:showAsAction="never"
         android:title="@string/use_strongbox" />
 
     <item
         android:id="@+id/menu_use_attest_key"
-        android:showAsAction="never"
         android:checkable="true"
+        android:showAsAction="never"
         android:title="@string/use_attest_key" />
 
     <item
         android:id="@+id/menu_incluid_props"
-        android:showAsAction="never"
         android:checkable="true"
+        android:showAsAction="never"
         android:title="@string/attest_device_props" />
 
     <item
