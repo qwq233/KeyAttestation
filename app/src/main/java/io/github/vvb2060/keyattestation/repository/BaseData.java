@@ -18,7 +18,7 @@ public abstract class BaseData {
 
         var status = certs.get(0).getIssuer();
         for (var cert : certs) {
-            if (cert.getStatus() < CertificateInfo.CERT_EXPIRED) {
+            if (cert.getStatus() != CertificateInfo.CERT_NORMAL) {
                 status = RootPublicKey.Status.FAILED;
                 break;
             }
