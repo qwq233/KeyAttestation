@@ -3,18 +3,16 @@ plugins {
 }
 
 android {
-    compileSdk 34
-    namespace 'io.github.vvb2060.keyattestation.stub'
+    namespace = "stub"
+    buildToolsVersion = '35.0.1'
+    compileSdk = 35
+
     defaultConfig {
-        minSdk 24
+        minSdk = 24
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-}
-
-dependencies {
-    implementation 'androidx.annotation:annotation:1.6.0'
 }

@@ -16,18 +16,17 @@
 
 package io.github.vvb2060.keyattestation.attestation;
 
-import android.util.Log;
+import android.util.Base64;
 
-import com.google.common.base.CharMatcher;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.BaseEncoding;
 
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import java.util.Set;
 
 import co.nstant.in.cbor.CborException;
-import io.github.vvb2060.keyattestation.AppApplication;
 
 /**
  * Parses an attestation certificate and provides an easy-to-use interface for examining the
@@ -38,7 +37,6 @@ public abstract class Attestation {
     static final String ASN1_OID = "1.3.6.1.4.1.11129.2.1.17";
     static final String KNOX_OID = "1.3.6.1.4.1.236.11.3.23.7";
     static final String KEY_USAGE_OID = "2.5.29.15"; // Standard key usage extension.
-    static final String CRL_DP_OID = "2.5.29.31"; // Standard CRL Distribution Points extension.
 
     public static final int KM_SECURITY_LEVEL_SOFTWARE = 0;
     public static final int KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT = 1;
@@ -79,10 +77,6 @@ public abstract class Attestation {
                 throw new CertificateParsingException("Unable to parse EAT extension", cbe);
             }
         }
-        if (x509Cert.getExtensionValue(CRL_DP_OID) != null) {
-            Log.w(AppApplication.TAG,
-                    "CRL Distribution Points extension found in leaf certificate.");
-        }
         if (x509Cert.getExtensionValue(KNOX_OID) != null) {
             return new KnoxAttestation(x509Cert);
         }
@@ -111,6 +105,7 @@ public abstract class Attestation {
             case 100 -> "KeyMint 1.0";
             case 200 -> "KeyMint 2.0";
             case 300 -> "KeyMint 3.0";
+            case 400 -> "KeyMint 4.0";
             default -> "Unknown (" + version + ")";
         };
     }
@@ -126,6 +121,7 @@ public abstract class Attestation {
             case 100 -> "KeyMint 1.0";
             case 200 -> "KeyMint 2.0";
             case 300 -> "KeyMint 3.0";
+            case 400 -> "KeyMint 4.0";
             default -> "Unknown (" + version + ")";
         };
     }
@@ -178,14 +174,14 @@ public abstract class Attestation {
 
         s.append("\nChallenge");
         String stringChallenge =
-                attestationChallenge != null ? new String(attestationChallenge) : "null";
-        if (CharMatcher.ascii().matchesAllOf(stringChallenge)) {
+                attestationChallenge != null ? new String(attestationChallenge) : "";
+        if (Arrays.equals(attestationChallenge, stringChallenge.getBytes())) {
             s.append(": [" + stringChallenge + "]");
-        } else {
-            s.append(" (base64): [" + BaseEncoding.base64().encode(attestationChallenge) + "]");
+        } else if (attestationChallenge != null) {
+            s.append(" (base64): [" + Base64.encodeToString(attestationChallenge, 0) + "]");
         }
         if (uniqueId != null) {
-            s.append("\nUnique ID (base64): [" + BaseEncoding.base64().encode(uniqueId) + "]");
+            s.append("\nUnique ID: [" + BaseEncoding.base16().lowerCase().encode(uniqueId) + "]");
         }
 
         s.append("\n-- SW enforced --");

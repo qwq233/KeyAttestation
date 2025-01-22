@@ -17,6 +17,9 @@ import java.io.InputStreamReader;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.Timestamp;
+import java.util.Date;
+import java.util.UUID;
 
 import io.github.vvb2060.keyattestation.AppApplication;
 import io.github.vvb2060.keyattestation.R;
@@ -68,7 +71,8 @@ public record RevocationList(String status, String reason) {
 
     @NonNull
     private static HttpURLConnection getHttpURLConnection() throws IOException {
-        URL url = new URL("https://android.googleapis.com/attestation/status");
+        var timestamp = System.currentTimeMillis(); // avoid cdn cache
+        URL url = new URL("https://android.googleapis.com/attestation/status?" + timestamp);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
         connection.setUseCaches(false);
