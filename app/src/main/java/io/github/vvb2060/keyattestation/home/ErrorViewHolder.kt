@@ -3,10 +3,9 @@ package io.github.vvb2060.keyattestation.home
 import android.view.View
 import io.github.vvb2060.keyattestation.R
 import io.github.vvb2060.keyattestation.databinding.HomeErrorBinding
-import io.github.vvb2060.keyattestation.ktx.toHtml
 import io.github.vvb2060.keyattestation.lang.AttestationException
 import rikka.html.text.HtmlCompat
-import rikka.recyclerview.BaseViewHolder.Creator
+import rikka.html.text.toHtml
 
 class ErrorViewHolder(itemView: View, binding: HomeErrorBinding) : HomeViewHolder<AttestationException, HomeErrorBinding>(itemView, binding) {
 
@@ -28,7 +27,7 @@ class ErrorViewHolder(itemView: View, binding: HomeErrorBinding) : HomeViewHolde
             sb.append("<font face=\"monospace\">")
             var tr = data.cause
             while (tr != null) {
-                sb.append("${tr::class.java.name}: ${tr.message}").append("<br>")
+                sb.append(tr).append("<br>")
                 tr = tr.cause
             }
             sb.append("</font>")

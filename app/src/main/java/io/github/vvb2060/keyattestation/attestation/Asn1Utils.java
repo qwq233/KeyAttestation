@@ -63,10 +63,9 @@ public class Asn1Utils {
 
     public static byte[] getByteArrayFromAsn1(ASN1Encodable asn1Encodable)
             throws CertificateParsingException {
-        if (!(asn1Encodable instanceof DEROctetString)) {
+        if (!(asn1Encodable instanceof DEROctetString derOctectString)) {
             throw new CertificateParsingException("Expected DEROctetString");
         }
-        ASN1OctetString derOctectString = (ASN1OctetString) asn1Encodable;
         return derOctectString.getOctets();
     }
 

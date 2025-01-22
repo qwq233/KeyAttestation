@@ -17,26 +17,29 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
-import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
+import androidx.activity.result.contract.ActivityResultContracts.GetContent
 import androidx.appcompat.app.AlertDialog
-import androidx.core.view.MenuHost
+import androidx.appcompat.widget.AppCompatEditText
 import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import com.google.common.io.BaseEncoding
+import androidx.fragment.app.viewModels
+import androidx.recyclerview.widget.LinearLayoutManager
 import io.github.vvb2060.keyattestation.AppApplication
 import io.github.vvb2060.keyattestation.BuildConfig
 import io.github.vvb2060.keyattestation.R
 import io.github.vvb2060.keyattestation.app.AlertDialogFragment
-import io.github.vvb2060.keyattestation.app.AppActivity
 import io.github.vvb2060.keyattestation.app.AppFragment
 import io.github.vvb2060.keyattestation.attestation.Attestation
-import io.github.vvb2060.keyattestation.attestation.CertificateInfo
+import io.github.vvb2060.keyattestation.attestation.AuthorizationList
 import io.github.vvb2060.keyattestation.databinding.HomeBinding
-import io.github.vvb2060.keyattestation.ktx.activityViewModels
-import io.github.vvb2060.keyattestation.ktx.toHtml
+import io.github.vvb2060.keyattestation.keystore.KeyStoreManager
 import io.github.vvb2060.keyattestation.lang.AttestationException
+import io.github.vvb2060.keyattestation.repository.AttestationData
 import io.github.vvb2060.keyattestation.util.Status
 import rikka.html.text.HtmlCompat
+import rikka.html.text.toHtml
+import rikka.shizuku.Shizuku
 import rikka.widget.borderview.BorderView
 
 class HomeFragment : AppFragment(), HomeAdapter.Listener, MenuProvider {
@@ -45,34 +48,22 @@ class HomeFragment : AppFragment(), HomeAdapter.Listener, MenuProvider {
 
     private val binding: HomeBinding get() = _binding!!
 
-    private val viewModel by activityViewModels {
-        val context = requireContext()
-        val sp = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        HomeViewModel(context.packageManager, sp)
-    }
+    private val viewModel: HomeViewModel by viewModels { HomeViewModel.Factory }
 
     private val save = registerForActivityResult(CreateDocument("application/x-pkcs7-certificates")) {
-        viewModel.save(requireContext().contentResolver, it)
+        viewModel.save(it)
     }
 
-    private val load = registerForActivityResult(OpenDocument()) {
-        viewModel.load(requireContext().contentResolver, it)
+    private val load = registerForActivityResult(GetContent()) {
+        viewModel.load(it)
+    }
+
+    private val import = registerForActivityResult(GetContent()) {
+        viewModel.import(it)
     }
 
     private val adapter by lazy {
         HomeAdapter(this)
-    }
-
-    private fun copyVerifiedBootHash(context: Context) {
-        val rootOfTrust = viewModel.getRootOfTrust()
-        if (rootOfTrust != null) {
-            val verifiedBootHash = BaseEncoding.base16().encode(rootOfTrust.verifiedBootHash).lowercase()
-            val clipboardManager =
-                context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboardManager.setPrimaryClip(ClipData.newPlainText("hash", verifiedBootHash))
-            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2)
-                Toast.makeText(context, "Copied: ${verifiedBootHash}", Toast.LENGTH_SHORT).show()
-        }
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -87,15 +78,16 @@ class HomeFragment : AppFragment(), HomeAdapter.Listener, MenuProvider {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        (requireActivity() as MenuHost).addMenuProvider(this, viewLifecycleOwner)
+        requireActivity().addMenuProvider(this, viewLifecycleOwner)
 
         val context = view.context
 
         binding.list.borderVisibilityChangedListener = BorderView.OnBorderVisibilityChangedListener { top: Boolean, _: Boolean, _: Boolean, _: Boolean -> appActivity?.appBar?.setRaised(!top) }
+        binding.list.layoutManager = LinearLayoutManager(context)
         binding.list.adapter = adapter
         binding.list.addItemDecoration(HomeItemDecoration(context))
 
-        viewModel.attestationResult.observe(viewLifecycleOwner) { res ->
+        viewModel.getAttestationData().observe(viewLifecycleOwner) { res ->
             when (res.status) {
                 Status.SUCCESS -> {
                     binding.progress.isVisible = false
@@ -116,130 +108,159 @@ class HomeFragment : AppFragment(), HomeAdapter.Listener, MenuProvider {
     }
 
     override fun onAttestationInfoClick(data: Attestation) {
-        val result = viewModel.attestationResult.value!!.data!!
+        val result = viewModel.getAttestationData().value!!.data!! as AttestationData
         result.showAttestation = data
         adapter.updateData(result)
     }
 
-    override fun onCertInfoClick(data: CertificateInfo) {
+    override fun onRkpHostnameClick(data: String) {
         val context = requireContext()
+        val dp24 = Math.round(24 * context.resources.displayMetrics.density)
+        val dp18 = Math.round(18 * context.resources.displayMetrics.density)
+        val editText = AppCompatEditText(context)
+        editText.setHint(R.string.rkp_hostname_empty)
+        editText.setText(data)
+        editText.setPadding(dp24, dp18, dp24, dp18)
+        editText.requestFocus()
 
-        AlertDialogFragment.Builder(context)
-                .title(context.getString(R.string.cert_info))
-                .message(data.cert.toString())
-                .positiveButton(android.R.string.ok)
-                .build()
-                .show(requireActivity().supportFragmentManager)
+        AlertDialog.Builder(context)
+            .setView(editText)
+            .setTitle(R.string.rkp_hostname)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                viewModel.rkp(editText.text?.toString())
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     override fun onCommonDataClick(data: Data) {
-        val context = requireContext()
+        val context = requireActivity()
 
         AlertDialogFragment.Builder(context)
-                .title(data.title)
-                .message(context.getString(data.description).toHtml(HtmlCompat.FROM_HTML_OPTION_TRIM_WHITESPACE))
-                .positiveButton(android.R.string.ok)
-                .build()
-                .show(requireActivity().supportFragmentManager)
-    }
-
-    override fun onSecurityLevelDataClick(data: SecurityLevelData) {
-        val context = requireContext()
-
-        AlertDialogFragment.Builder(context)
-                .title(data.title)
-                .message("${context.getString(data.description)}<p>${context.getString(data.securityLevelDescription)}".toHtml(HtmlCompat.FROM_HTML_SEPARATOR_LINE_BREAK_LIST_ITEM or HtmlCompat.FROM_HTML_OPTION_TRIM_WHITESPACE))
-                .positiveButton(android.R.string.ok)
-                .build()
-                .show((context as AppActivity).supportFragmentManager)
-    }
-
-    override fun onAuthorizationItemDataClick(data: AuthorizationItemData) {
-        val context = requireContext()
-
-        if (!data.data.isNullOrBlank() && data.data.contains("verifiedBootHash: ")) {
-            copyVerifiedBootHash(context)
-        }
-
-        val message = if (!data.data.isNullOrBlank()) "${context.getString(data.description)}<p>* ${context.getString(if (data.tee) R.string.tee_enforced_description else R.string.sw_enforced_description)}"
-                .toHtml(HtmlCompat.FROM_HTML_OPTION_TRIM_WHITESPACE)
-        else
-            context.getString(data.description).toHtml(HtmlCompat.FROM_HTML_OPTION_TRIM_WHITESPACE)
-
-        AlertDialogFragment.Builder(context)
-                .title(data.title)
-                .message(message)
-                .positiveButton(android.R.string.ok)
-                .build()
-                .show(requireActivity().supportFragmentManager)
+            .title(data.title)
+            .message(data.getMessage(context))
+            .positiveButton(android.R.string.ok)
+            .build()
+            .show(context.supportFragmentManager)
     }
 
     override fun onPrepareMenu(menu: Menu) {
+        menu.findItem(R.id.menu_use_shizuku).apply {
+            isVisible = Shizuku.pingBinder()
+            val received = KeyStoreManager.getRemoteKeyStore() != null
+            if (!received) viewModel.preferShizuku = false
+            isEnabled = received
+            isChecked = viewModel.preferShizuku
+        }
+
         menu.findItem(R.id.menu_secret_mode).apply {
             isVisible = true
             isChecked = viewModel.secretMode
         }
 
-        menu.findItem(R.id.menu_use_sak).apply {
-            isVisible = viewModel.hasSAK
-            isChecked = viewModel.preferSAK
-        }
-        menu.findItem(R.id.menu_use_strongbox).apply {
-            isVisible = viewModel.hasStrongBox
-            isChecked = viewModel.preferStrongBox
-        }
-        menu.findItem(R.id.menu_use_attest_key).apply {
-            isVisible = viewModel.hasAttestKey
-            isEnabled = !viewModel.preferSAK
-            isChecked = !viewModel.preferSAK && viewModel.preferAttestKey
-        }
-        menu.findItem(R.id.menu_incluid_props).apply {
-            isVisible = viewModel.hasDeviceIds
-            isChecked = viewModel.preferIncludeProps
-        }
-        menu.findItem(R.id.menu_save).isVisible = viewModel.currentCerts != null
+        menu.findItem(R.id.menu_use_strongbox)?.isVisible = !viewModel.preferSak
+        menu.findItem(R.id.menu_use_attest_key)?.isVisible = !viewModel.preferSak
+        menu.findItem(R.id.menu_import_attest_key)?.isVisible = !viewModel.preferSak
+                && viewModel.preferAttestKey
+
+        menu.setGroupVisible(R.id.menu_id_type_group, viewModel.preferShizuku)
+        menu.findItem(R.id.menu_include_unique_id).isVisible =
+            viewModel.preferShizuku && viewModel.canIncludeUniqueId
+        menu.findItem(R.id.menu_rkp_test).isVisible =
+            viewModel.preferShizuku && viewModel.canCheckRkp
+        menu.findItem(R.id.menu_use_sak)?.isVisible =
+            viewModel.preferShizuku && viewModel.canSak
+
+        menu.findItem(R.id.menu_save).isVisible = viewModel.hasCertificates()
     }
 
     override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
         menuInflater.inflate(R.menu.home, menu)
+        menu.findItem(R.id.menu_use_strongbox).isChecked = viewModel.preferStrongBox
+        menu.findItem(R.id.menu_use_attest_key).isChecked = viewModel.preferAttestKey
+        menu.findItem(R.id.menu_include_props).isChecked = viewModel.preferIncludeProps
+        menu.findItem(R.id.menu_id_type_serial).isChecked = viewModel.preferIdAttestationSerial
+        menu.findItem(R.id.menu_id_type_imei).isChecked = viewModel.preferIdAttestationIMEI
+        menu.findItem(R.id.menu_id_type_meid).isChecked = viewModel.preferIdAttestationMEID
+        menu.findItem(R.id.menu_include_unique_id).isChecked = viewModel.preferIncludeUniqueId
+        menu.findItem(R.id.menu_use_sak).isChecked = viewModel.preferSak
+        if (!viewModel.hasSak) {
+            menu.removeItem(R.id.menu_use_sak)
+        }
+        if (!viewModel.hasStrongBox) {
+            menu.removeItem(R.id.menu_use_strongbox)
+        }
+        if (!viewModel.hasAttestKey) {
+            menu.removeItem(R.id.menu_use_attest_key)
+            menu.removeItem(R.id.menu_import_attest_key)
+        }
+        if (!viewModel.hasDeviceIds) {
+            menu.removeItem(R.id.menu_include_props)
+            menu.removeItem(R.id.menu_id_type_serial)
+            menu.removeItem(R.id.menu_id_type_imei)
+            menu.removeItem(R.id.menu_id_type_meid)
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            menu.removeItem(R.id.menu_include_props)
+        }
+        if (!viewModel.hasIMEI) {
+            menu.removeItem(R.id.menu_id_type_imei)
+        }
+        if (!viewModel.hasMEID) {
+            menu.removeItem(R.id.menu_id_type_meid)
+        }
     }
 
     override fun onMenuItemSelected(item: MenuItem): Boolean {
+        val status = !item.isChecked
+        item.isChecked = status
         when (item.itemId) {
             R.id.menu_secret_mode -> {
-                val status = !item.isChecked
-                item.isChecked = status
                 viewModel.secretMode = status
                 viewModel.load()
             }
-
+            R.id.menu_use_shizuku -> {
+                viewModel.preferShizuku = status
+                viewModel.load()
+            }
             R.id.menu_use_sak -> {
-                val status = !item.isChecked
-                item.isChecked = status
-                viewModel.preferSAK = status
+                viewModel.preferSak = status
                 viewModel.load()
             }
             R.id.menu_use_strongbox -> {
-                val status = !item.isChecked
-                item.isChecked = status
                 viewModel.preferStrongBox = status
                 viewModel.load()
             }
             R.id.menu_use_attest_key -> {
-                val status = !item.isChecked
-                item.isChecked = status
                 viewModel.preferAttestKey = status
                 viewModel.load()
             }
-            R.id.menu_incluid_props -> {
-                val status = !item.isChecked
-                item.isChecked = status
+            R.id.menu_include_props -> {
                 viewModel.preferIncludeProps = status
+                viewModel.load()
+            }
+            R.id.menu_id_type_serial -> {
+                viewModel.preferIdAttestationSerial = status
+                viewModel.load()
+            }
+            R.id.menu_id_type_imei -> {
+                viewModel.preferIdAttestationIMEI = status
+                viewModel.load()
+            }
+            R.id.menu_id_type_meid -> {
+                viewModel.preferIdAttestationMEID = status
+                viewModel.load()
+            }
+            R.id.menu_include_unique_id -> {
+                viewModel.preferIncludeUniqueId = status
                 viewModel.load()
             }
             R.id.menu_copy_vbhash -> {
                 val context = requireContext()
                 copyVerifiedBootHash(context)
+            }
+            R.id.menu_rkp_test -> {
+                viewModel.rkp()
             }
             R.id.menu_reset -> {
                 viewModel.load(true)
@@ -248,31 +269,68 @@ class HomeFragment : AppFragment(), HomeAdapter.Listener, MenuProvider {
                 save.launch("${Build.PRODUCT}-${AppApplication.TAG}.p7b")
             }
             R.id.menu_load -> {
-                load.launch(arrayOf("application/*"))
+                load.launch("*/*")
+            }
+            R.id.menu_import_attest_key -> {
+                import.launch("text/xml")
             }
             R.id.menu_about -> {
-                val context = requireContext()
-                val versionName = BuildConfig.VERSION_NAME
-
-                val text = StringBuilder()
-                text.append(versionName)
-                        .append("<p>")
-                        .append(getString(R.string.open_source_info, "<b><a href=\"${context.getString(R.string.github_url)}\">GitHub</a></b>", context.getString(R.string.license)))
-                text.append("<p>").append(context.getString(R.string.copyright))
-
-                val dialog: Dialog = AlertDialog.Builder(context)
-                        .setView(rikka.material.R.layout.dialog_about)
-                        .show()
-                dialog.findViewById<ImageView>(rikka.material.R.id.design_about_icon).setImageDrawable(context.getDrawable(R.drawable.ic_launcher))
-                dialog.findViewById<TextView>(rikka.material.R.id.design_about_title).text = getString(R.string.app_name)
-                dialog.findViewById<TextView>(rikka.material.R.id.design_about_version).apply {
-                    movementMethod = LinkMovementMethod.getInstance()
-                    this.text = text.toHtml(HtmlCompat.FROM_HTML_OPTION_TRIM_WHITESPACE)
-                }
-                dialog.findViewById<TextView>(rikka.material.R.id.design_about_info).isVisible = false
+                showAboutDialog()
             }
             else -> return false
         }
         return true
+    }
+
+    private fun showAboutDialog() {
+        val context = requireContext()
+        val text = StringBuilder()
+        val source = "<b><a href=\"${context.getString(R.string.github_url)}\">GitHub</a></b>"
+        val shizuku = "<b><a href=\"${context.getString(R.string.shizuku_url)}\">Web</a></b>"
+        text.append(BuildConfig.VERSION_NAME).append("<p>")
+        text.append(getString(R.string.open_source_info, source, context.getString(R.string.license)))
+        if (Shizuku.pingBinder()) {
+            KeyStoreManager.requestPermission()
+        } else if (KeyStoreManager.isShizukuInstalled()) {
+            KeyStoreManager.requestBinder(context)
+            text.append("<p>").append(context.getString(R.string.start_shizuku))
+        } else {
+            text.append("<p>").append(context.getString(R.string.install_shizuku, shizuku))
+        }
+        text.append("<p>").append(context.getString(R.string.copyright))
+        val icon = context.getDrawable(R.drawable.ic_launcher)
+        val dialog: Dialog = AlertDialog.Builder(context)
+                .setView(rikka.material.R.layout.dialog_about)
+                .show()
+        dialog.findViewById<TextView>(rikka.material.R.id.design_about_info).isVisible = false
+        dialog.findViewById<ImageView>(rikka.material.R.id.design_about_icon).setImageDrawable(icon)
+        dialog.findViewById<TextView>(rikka.material.R.id.design_about_title).text = getString(R.string.app_name)
+        dialog.findViewById<TextView>(rikka.material.R.id.design_about_version).apply {
+            movementMethod = LinkMovementMethod.getInstance()
+            this.text = text.toHtml(HtmlCompat.FROM_HTML_OPTION_TRIM_WHITESPACE)
+        }
+
+    }
+
+    private fun copyVerifiedBootHash(context: Context) {
+        viewModel.getAttestationData().observe(viewLifecycleOwner) { res ->
+            when (res.status) {
+                Status.SUCCESS -> {
+                    val rootOfTrust = (res.data as AttestationData).rootOfTrust
+                    val verifiedBootHash = BaseEncoding.base16().encode(rootOfTrust.verifiedBootHash).lowercase()
+                    val clipboardManager =
+                        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboardManager.setPrimaryClip(ClipData.newPlainText("hash", verifiedBootHash))
+                    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2)
+                        Toast.makeText(context, R.string.copy_vbhash_success, Toast.LENGTH_SHORT).show()
+                }
+                Status.ERROR -> {
+                    Toast.makeText(context, R.string.copy_vbhash_error, Toast.LENGTH_SHORT).show()
+                }
+                Status.LOADING -> {
+                    Toast.makeText(context, R.string.copy_vbhash_loading, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 }

@@ -1,6 +1,7 @@
 package io.github.vvb2060.keyattestation.home
 
 import android.content.Context
+import android.util.Pair
 import android.view.View
 import androidx.core.view.isVisible
 import io.github.vvb2060.keyattestation.AppApplication
@@ -9,6 +10,7 @@ import io.github.vvb2060.keyattestation.attestation.Attestation.KM_SECURITY_LEVE
 import io.github.vvb2060.keyattestation.attestation.Attestation.KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT
 import io.github.vvb2060.keyattestation.attestation.AuthorizationList
 import io.github.vvb2060.keyattestation.attestation.CertificateInfo
+import io.github.vvb2060.keyattestation.attestation.RootPublicKey
 import io.github.vvb2060.keyattestation.databinding.HomeCommonItemBinding
 import rikka.core.res.resolveColorStateList
 import rikka.recyclerview.BaseViewHolder.Creator
@@ -16,9 +18,51 @@ import java.util.Date
 import javax.security.auth.x500.X500Principal
 
 
-open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBinding) : HomeViewHolder<T, HomeCommonItemBinding>(itemView, binding) {
+open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBinding) :
+    HomeViewHolder<T, HomeCommonItemBinding>(itemView, binding) {
 
     companion object {
+        val SIMPLE_CREATOR = Creator<Pair<String, String>> { inflater, parent ->
+            val binding = HomeCommonItemBinding.inflate(inflater, parent, false)
+            object : CommonItemViewHolder<Pair<String, String>>(binding.root, binding) {
+
+                init {
+                    this.binding.apply {
+                        text1.isVisible = false
+                        icon.isVisible = false
+                    }
+                }
+
+                override fun onBind() {
+                    binding.title.text = data.first
+                    binding.summary.text = data.second
+                }
+            }
+        }
+
+        val HOSTNAME_CREATOR = Creator<StringData> { inflater, parent ->
+            val binding = HomeCommonItemBinding.inflate(inflater, parent, false)
+            object : CommonItemViewHolder<StringData>(binding.root, binding) {
+
+                init {
+                    this.binding.apply {
+                        icon.isVisible = false
+                        root.setOnClickListener {
+                            listener.onRkpHostnameClick(data.data)
+                        }
+                    }
+                }
+
+                override fun onBind() {
+                    binding.title.setText(data.title)
+                    if (data.data.isEmpty()) {
+                        binding.summary.setText(R.string.rkp_hostname_empty)
+                    } else {
+                        binding.summary.text = data.data
+                    }
+                }
+            }
+        }
 
         val COMMON_CREATOR = Creator<CommonData> { inflater, parent ->
             val binding = HomeCommonItemBinding.inflate(inflater, parent, false)
@@ -35,10 +79,10 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
 
                 override fun onBind() {
                     binding.title.setText(data.title)
-                    if (!data.data.isNullOrBlank()) {
-                        binding.summary.text = data.data
-                    } else {
+                    if (data.data.isNullOrEmpty()) {
                         binding.summary.setText(R.string.empty)
+                    } else {
+                        binding.summary.text = data.data
                     }
                 }
             }
@@ -51,7 +95,7 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
                 init {
                     this.binding.apply {
                         root.setOnClickListener {
-                            listener.onAuthorizationItemDataClick(data)
+                            listener.onCommonDataClick(data)
                         }
                         icon.isVisible = false
                     }
@@ -60,16 +104,11 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
                 override fun onBind() {
                     binding.apply {
                         title.setText(data.title)
-                        if (!data.data.isNullOrBlank()) {
-                            if (data.data!!.contains("verifiedBootHash: ")) {
-                                btnCopy.isVisible = true
-                            }
-                            summary.text = data.data
-                            text1.setText(if (data.tee) R.string.tee_enforced else R.string.sw_enforced)
-                            text1.isVisible = true
-                        } else {
+                        text1.setText(if (data.tee) R.string.tee_enforced else R.string.sw_enforced)
+                        if (data.data.isEmpty()) {
                             summary.setText(R.string.empty)
-                            text1.isVisible = false
+                        } else {
+                            summary.text = data.data
                         }
                     }
                 }
@@ -85,7 +124,7 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
                         text1.isVisible = false
                         icon.background = null
                         root.setOnClickListener {
-                            listener.onSecurityLevelDataClick(data)
+                            listener.onCommonDataClick(data)
                         }
                     }
                 }
@@ -133,6 +172,13 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
                         title.isVisible = false
                         text1.isVisible = false
                         icon.background = null
+                        icon.setOnClickListener {
+                            data.attestation?.let { listener.onAttestationInfoClick(it) }
+                        }
+                        root.setOnClickListener {
+                            val stringData = StringData(R.string.cert_info, data.cert.toString())
+                            listener.onCommonDataClick(stringData)
+                        }
                     }
                 }
 
@@ -140,15 +186,12 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
                     val iconRes: Int?
                     val colorAttr: Int?
                     binding.icon.apply {
-                        setOnClickListener {
-                            data.attestation?.let { listener.onAttestationInfoClick(it) }
-                        }
-                        if (data.issuer == CertificateInfo.KEY_AOSP) {
+                        if (data.issuer == RootPublicKey.Status.AOSP) {
                             isVisible = true
                             isClickable = false
                             iconRes = R.drawable.ic_untrustworthy_24
                             colorAttr = rikka.material.R.attr.colorWarning
-                        } else if (data.issuer == CertificateInfo.KEY_GOOGLE) {
+                        } else if (data.issuer == RootPublicKey.Status.GOOGLE) {
                             isVisible = true
                             isClickable = false
                             iconRes = R.drawable.ic_trustworthy_24
@@ -166,10 +209,6 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
                         }
                         iconRes?.let { setImageDrawable(context.getDrawable(it)) }
                         colorAttr?.let { imageTintList = context.theme.resolveColorStateList(it) }
-                    }
-
-                    binding.root.setOnClickListener {
-                        listener.onCertInfoClick(data)
                     }
 
                     val secretMode =
@@ -200,10 +239,17 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
                         sb.append(AuthorizationList.formatDate(cert.notAfter))
                     }
 
-                    if (data.certsIssued != null) {
-                        sb.append("\n")
+                    data.provisioningInfo?.apply {
+                        certsIssued?.let {
+                            sb.append("\n")
                                 .append(res.getString(R.string.provisioning_info_certs_issued))
-                                .append(data.certsIssued)
+                                .append(it)
+                        }
+                        manufacturer?.let {
+                            sb.append("\n")
+                                .append(res.getString(R.string.provisioning_info_manufacturer))
+                                .append(it)
+                        }
                     }
 
                     val resId = when (data.status) {

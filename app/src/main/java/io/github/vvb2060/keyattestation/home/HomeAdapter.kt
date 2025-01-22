@@ -1,28 +1,23 @@
 package io.github.vvb2060.keyattestation.home
 
-import com.google.common.base.CharMatcher
+import android.util.Base64
+import android.util.Pair
 import com.google.common.io.BaseEncoding
 import io.github.vvb2060.keyattestation.R
-import io.github.vvb2060.keyattestation.attestation.Attestation
-import io.github.vvb2060.keyattestation.attestation.AttestationResult
-import io.github.vvb2060.keyattestation.attestation.AuthorizationList
-import io.github.vvb2060.keyattestation.attestation.CertificateInfo
-import io.github.vvb2060.keyattestation.attestation.KnoxAttestation
+import io.github.vvb2060.keyattestation.attestation.*
 import io.github.vvb2060.keyattestation.lang.AttestationException
+import io.github.vvb2060.keyattestation.lang.AttestationException.Companion.CODE_RKP
+import io.github.vvb2060.keyattestation.repository.AttestationData
+import io.github.vvb2060.keyattestation.repository.BaseData
+import io.github.vvb2060.keyattestation.repository.RemoteProvisioningData
 import rikka.recyclerview.IdBasedRecyclerViewAdapter
 
 class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
 
     interface Listener {
         fun onCommonDataClick(data: Data)
-
-        fun onSecurityLevelDataClick(data: SecurityLevelData)
-
-        fun onAuthorizationItemDataClick(data: AuthorizationItemData)
-
-        fun onCertInfoClick(data: CertificateInfo)
-
         fun onAttestationInfoClick(data: Attestation)
+        fun onRkpHostnameClick(data: String)
     }
 
     init {
@@ -30,47 +25,59 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
         setListener(listener)
     }
 
-    fun updateData(attestationResult: AttestationResult) {
-        val attestation = attestationResult.showAttestation
-
+    fun updateData(baseData: BaseData) {
         clear()
-        when (attestationResult.status) {
-            CertificateInfo.KEY_FAILED -> {
+        when (baseData.status) {
+            RootPublicKey.Status.NULL -> {
+                addItem(HeaderViewHolder.CREATOR, HeaderData(
+                        R.string.error_remote_key_provisioning,
+                        0,
+                        R.drawable.ic_error_outline_24,
+                        rikka.material.R.attr.colorInactive), ID_CERT_STATUS)
+            }
+            RootPublicKey.Status.FAILED -> {
                 addItem(HeaderViewHolder.CREATOR, HeaderData(
                         R.string.cert_chain_not_trusted,
                         R.string.cert_chain_not_trusted_summary,
                         R.drawable.ic_error_outline_24,
                         rikka.material.R.attr.colorAlert), ID_CERT_STATUS)
             }
-            CertificateInfo.KEY_UNKNOWN -> {
+            RootPublicKey.Status.UNKNOWN -> {
                 addItem(HeaderViewHolder.CREATOR, HeaderData(
                         R.string.unknown_root_cert,
                         R.string.unknown_root_cert_summary,
                         R.drawable.ic_error_outline_24,
                         rikka.material.R.attr.colorWarning), ID_CERT_STATUS)
             }
-            CertificateInfo.KEY_AOSP -> {
+            RootPublicKey.Status.AOSP -> {
                 addItem(HeaderViewHolder.CREATOR, HeaderData(
                         R.string.aosp_root_cert,
                         R.string.aosp_root_cert_summary,
                         R.drawable.ic_error_outline_24,
                         rikka.material.R.attr.colorWarning), ID_CERT_STATUS)
             }
-            CertificateInfo.KEY_GOOGLE -> {
+            RootPublicKey.Status.GOOGLE -> {
                 addItem(HeaderViewHolder.CREATOR, HeaderData(
                         R.string.google_root_cert,
                         R.string.google_root_cert_summary,
                         R.drawable.ic_trustworthy_24,
                         rikka.material.R.attr.colorSafe), ID_CERT_STATUS)
             }
-            CertificateInfo.KEY_KNOX -> {
+            RootPublicKey.Status.GOOGLE_RKP -> {
                 addItem(HeaderViewHolder.CREATOR, HeaderData(
-                    R.string.knox_root_cert,
-                    R.string.knox_root_cert_summary,
-                    R.drawable.ic_trustworthy_24,
-                    rikka.material.R.attr.colorSafe), ID_CERT_STATUS)
+                        R.string.google_root_cert_rkp,
+                        R.string.google_root_cert_rkp_summary,
+                        R.drawable.ic_trustworthy_24,
+                        rikka.material.R.attr.colorSafe), ID_CERT_STATUS)
             }
-            CertificateInfo.KEY_OEM -> {
+            RootPublicKey.Status.KNOX -> {
+                addItem(HeaderViewHolder.CREATOR, HeaderData(
+                        R.string.knox_root_cert,
+                        R.string.knox_root_cert_summary,
+                        R.drawable.ic_trustworthy_24,
+                        rikka.material.R.attr.colorSafe), ID_CERT_STATUS)
+            }
+            RootPublicKey.Status.OEM -> {
                 addItem(HeaderViewHolder.CREATOR, HeaderData(
                         R.string.oem_root_cert,
                         R.string.oem_root_cert_summary,
@@ -78,17 +85,28 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
                         rikka.material.R.attr.colorSafe), ID_CERT_STATUS)
             }
         }
-        addItem(BootStateViewHolder.CREATOR, attestationResult, ID_BOOT_STATUS)
 
         var id = ID_CERT_INFO_START
-        addItem(SubtitleViewHolder.CREATOR, SubtitleData(
+        addItem(SubtitleViewHolder.CREATOR, CommonData(
                 R.string.cert_chain,
                 R.string.cert_chain_description), id++)
-        attestationResult.certs.forEach { certInfo ->
+        baseData.certs.forEach { certInfo ->
             addItem(CommonItemViewHolder.CERT_INFO_CREATOR, certInfo, id++)
         }
 
-        id = ID_DESCRIPTION_START
+        when (baseData) {
+            is AttestationData -> updateData(baseData)
+            is RemoteProvisioningData -> updateData(baseData)
+        }
+
+        notifyDataSetChanged()
+    }
+
+    private fun updateData(attestationData: AttestationData) {
+        addItemAt(1, BootStateViewHolder.CREATOR, attestationData, ID_BOOT_STATUS)
+
+        var id = ID_DESCRIPTION_START
+        val attestation = attestationData.showAttestation ?: return
         addItem(CommonItemViewHolder.SECURITY_LEVEL_CREATOR, SecurityLevelData(
                 R.string.attestation,
                 R.string.attestation_version_description,
@@ -108,45 +126,45 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
                 R.string.attestation_challenge_description,
                 attestation.attestationChallenge?.let {
                     val stringChallenge = String(it)
-                    if (CharMatcher.ascii().matchesAllOf(stringChallenge)) stringChallenge
-                    else BaseEncoding.base64().encode(it) + " (base64)"
+                    if (stringChallenge.toByteArray().contentEquals(it)) stringChallenge
+                    else Base64.encodeToString(it, 0) + " (base64)"
                 }), id++)
 
         addItem(CommonItemViewHolder.COMMON_CREATOR, CommonData(
                 R.string.unique_id,
                 R.string.unique_id_description,
-                attestation.uniqueId?.let { BaseEncoding.base64().encode(it) }), id)
+                attestation.uniqueId?.let { BaseEncoding.base16().lowerCase().encode(it) }), id)
 
         id = ID_AUTHORIZATION_LIST_START
-        addItem(SubtitleViewHolder.CREATOR, SubtitleData(
+        addItem(SubtitleViewHolder.CREATOR, CommonData(
                 R.string.authorization_list,
                 R.string.authorization_list_description), id++)
 
         val tee = createAuthorizationItems(attestation.teeEnforced)
         val sw = createAuthorizationItems(attestation.softwareEnforced)
         for (i in tee.indices) {
-            if (tee[i] == null && sw[i] == null) {
+            val h = tee[i]
+            val s = sw[i]
+            if (h == null && s == null) {
                 continue
             }
 
             addItem(CommonItemViewHolder.AUTHORIZATION_ITEM_CREATOR, AuthorizationItemData(
                     authorizationItemTitles[i],
                     authorizationItemDescriptions[i],
-                    tee[i],
-                    sw[i]), id++)
+                    h, s), id++)
 
-            if (tee[i] != null && sw[i] != null) {
+            if (h != null && s != null) {
                 addItem(CommonItemViewHolder.AUTHORIZATION_ITEM_CREATOR, AuthorizationItemData(
                         authorizationItemTitles[i],
                         authorizationItemDescriptions[i],
-                        sw[i],
-                        false), id++)
+                        s, false), id++)
             }
         }
 
         if (attestation is KnoxAttestation) {
             id = ID_KNOX_START
-            addItem(SubtitleViewHolder.CREATOR, SubtitleData(
+            addItem(SubtitleViewHolder.CREATOR, CommonData(
                     R.string.knox,
                     R.string.knox_description), id++)
 
@@ -156,6 +174,11 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
                     attestation.knoxChallenge), id++)
 
             addItem(CommonItemViewHolder.COMMON_CREATOR, CommonData(
+                R.string.knox_id_attest,
+                R.string.knox_id_attest_description,
+                attestation.idAttest), id++)
+
+            addItem(CommonItemViewHolder.COMMON_CREATOR, CommonData(
                     R.string.knox_integrity,
                     R.string.knox_integrity_description,
                     attestation.knoxIntegrity.toString()), id++)
@@ -163,10 +186,52 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
             addItem(CommonItemViewHolder.COMMON_CREATOR, CommonData(
                     R.string.knox_record_hash,
                     R.string.knox_record_hash_description,
-                    BaseEncoding.base16().encode(attestation.recordHash)), id++)
+                    BaseEncoding.base16().lowerCase().encode(attestation.recordHash)), id++)
+        }
+    }
+
+    private fun updateData(rkpData: RemoteProvisioningData) {
+        if (rkpData.status == RootPublicKey.Status.NULL) {
+            removeItemAt(1)
+            var e = AttestationException(CODE_RKP, rkpData.error)
+            addItemAt(1, ErrorViewHolder.CREATOR, e, ID_CERT_INFO_START)
         }
 
-        notifyDataSetChanged()
+        if (rkpData.rkpHostname != null) {
+            addItem(CommonItemViewHolder.HOSTNAME_CREATOR, StringData(
+                R.string.rkp_hostname,
+                rkpData.rkpHostname), ID_RKP_HOSTNAME)
+        }
+
+        var id = ID_DESCRIPTION_START
+        var hardware = rkpData.hardwareInfo
+        addItem(SubtitleViewHolder.CREATOR, CommonData(
+            R.string.rpc_hardware_info,
+            R.string.rpc_hardware_info_description), id++)
+
+        addItem(CommonItemViewHolder.COMMON_CREATOR, CommonData(
+            R.string.rpc_version_number,
+            R.string.rpc_version_number_description,
+            hardware.versionNumber.toString()), id++)
+
+        addItem(CommonItemViewHolder.COMMON_CREATOR, CommonData(
+            R.string.rpc_author_name,
+            R.string.rpc_author_name_description,
+            hardware.rpcAuthorName.toString()), id++)
+
+        addItem(CommonItemViewHolder.COMMON_CREATOR, CommonData(
+            R.string.rpc_unique_id,
+            R.string.rpc_unique_id_description,
+            hardware.uniqueId), id++)
+
+        id = ID_AUTHORIZATION_LIST_START
+        addItem(SubtitleViewHolder.CREATOR, CommonData(
+            R.string.rkp_device_info,
+            R.string.rkp_device_info_description), id++)
+
+        rkpData.deviceInfo.forEach { key, value ->
+            addItem(CommonItemViewHolder.SIMPLE_CREATOR, Pair(key, value), id++)
+        }
     }
 
     fun updateData(e: AttestationException) {
@@ -203,9 +268,10 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
     companion object {
 
         private const val ID_ERROR = 0L
-        private const val ID_BOOT_STATUS = 1L
-        private const val ID_CERT_STATUS = 2L
-        private const val ID_CERT_INFO_START = 2000L
+        private const val ID_CERT_STATUS = 1L
+        private const val ID_BOOT_STATUS = 2L
+        private const val ID_CERT_INFO_START = 1000L
+        private const val ID_RKP_HOSTNAME = 2000L
         private const val ID_DESCRIPTION_START = 3000L
         private const val ID_AUTHORIZATION_LIST_START = 4000L
         private const val ID_KNOX_START = 5000L
@@ -256,6 +322,7 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
                     list.bootPatchLevel?.toString(),
                     list.deviceUniqueAttestation?.toString(),
                     list.identityCredentialKey?.toString(),
+                    list.moduleHash?.let { BaseEncoding.base16().lowerCase().encode(it) },
             )
         }
 
@@ -303,6 +370,7 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
                 R.string.authorization_list_bootPatchLevel,
                 R.string.authorization_list_deviceUniqueAttestation,
                 R.string.authorization_list_identityCredentialKey,
+                R.string.authorization_list_moduleHash,
         )
 
         private val authorizationItemDescriptions = arrayOf(
@@ -349,6 +417,7 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
                 R.string.authorization_list_bootPatchLevel_description,
                 R.string.authorization_list_deviceUniqueAttestation_description,
                 R.string.authorization_list_identityCredentialKey_description,
+                R.string.authorization_list_moduleHash_description,
         )
     }
 }
