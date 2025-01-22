@@ -30,7 +30,7 @@ android {
     buildToolsVersion = '35.0.1'
     namespace = 'io.github.vvb2060.keyattestation'
     defaultConfig {
-        applicationId 'io.github.qwq233.keyattestation'
+        applicationId 'io.github.vvb2060.keyattestation'
         minSdk = 24
         targetSdk = 35
         versionCode = gitCommitCount
