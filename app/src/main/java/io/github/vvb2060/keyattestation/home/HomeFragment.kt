@@ -313,24 +313,25 @@ class HomeFragment : AppFragment(), HomeAdapter.Listener, MenuProvider {
     }
 
     private fun copyVerifiedBootHash(context: Context) {
-        viewModel.getAttestationData().observe(viewLifecycleOwner) { res ->
-            when (res.status) {
-                Status.SUCCESS -> {
-                    val rootOfTrust = (res.data as AttestationData).rootOfTrust
-                    val verifiedBootHash = BaseEncoding.base16().encode(rootOfTrust.verifiedBootHash).lowercase()
-                    val clipboardManager =
-                        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboardManager.setPrimaryClip(ClipData.newPlainText("hash", verifiedBootHash))
-                    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2)
-                        Toast.makeText(context, R.string.copy_vbhash_success, Toast.LENGTH_SHORT).show()
-                }
-                Status.ERROR -> {
-                    Toast.makeText(context, R.string.copy_vbhash_error, Toast.LENGTH_SHORT).show()
-                }
-                Status.LOADING -> {
-                    Toast.makeText(context, R.string.copy_vbhash_loading, Toast.LENGTH_SHORT).show()
-                }
+        when (viewModel.getAttestationData().value?.status) {
+            Status.SUCCESS -> {
+                val rootOfTrust = (viewModel.getAttestationData().value!!.data as AttestationData).rootOfTrust
+                val verifiedBootHash = BaseEncoding.base16().encode(rootOfTrust.verifiedBootHash).lowercase()
+                val clipboardManager =
+                    context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboardManager.setPrimaryClip(ClipData.newPlainText("hash", verifiedBootHash))
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2)
+                    Toast.makeText(context, R.string.copy_vbhash_success, Toast.LENGTH_SHORT).show()
+            }
+
+            Status.ERROR -> {
+                Toast.makeText(context, R.string.copy_vbhash_error, Toast.LENGTH_SHORT).show()
+            }
+
+            Status.LOADING, null -> {
+                Toast.makeText(context, R.string.copy_vbhash_loading, Toast.LENGTH_SHORT).show()
             }
         }
     }
+
 }
