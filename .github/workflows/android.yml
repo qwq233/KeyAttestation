@@ -13,14 +13,14 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v4
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/checkout@v7.0.1
+      - name: Set up JDK 27
+        uses: actions/setup-java@v6.1.0
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '27'
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6.4.1
         with:
           build-scan-publish: true
           build-scan-terms-of-use-url: "https://gradle.com/terms-of-service"
@@ -33,7 +33,7 @@ jobs:
           echo 'org.gradle.parallel=true' >> gradle.properties
           ./gradlew assemble
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: ${{ matrix.os }}-artifact
           path: app/build/outputs
