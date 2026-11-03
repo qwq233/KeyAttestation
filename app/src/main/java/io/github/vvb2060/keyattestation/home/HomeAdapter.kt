@@ -90,8 +90,13 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
         addItem(SubtitleViewHolder.CREATOR, CommonData(
                 R.string.cert_chain,
                 R.string.cert_chain_description), id++)
+        val certInfoCreator = if (baseData is AttestationData) {
+            CommonItemViewHolder.ATTESTATION_CERT_INFO_CREATOR
+        } else {
+            CommonItemViewHolder.CERT_INFO_CREATOR
+        }
         baseData.certs.forEach { certInfo ->
-            addItem(CommonItemViewHolder.CERT_INFO_CREATOR, certInfo, id++)
+            addItem(certInfoCreator, certInfo, id++)
         }
 
         when (baseData) {
@@ -134,6 +139,52 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
                 R.string.unique_id,
                 R.string.unique_id_description,
                 attestation.uniqueId?.let { BaseEncoding.base16().lowerCase().encode(it) }), id)
+
+        val provisioningInfos = attestationData.certs.mapNotNull { it.provisioningInfo }
+        if (provisioningInfos.isNotEmpty()) {
+            id = ID_PROVISIONING_INFO_START
+            addItem(SubtitleViewHolder.CREATOR, CommonData(
+                    R.string.provisioning_info,
+                    R.string.provisioning_info_description), id++)
+            provisioningInfos.forEach { info ->
+                info.certsIssued?.let {
+                    addItem(CommonItemViewHolder.COMMON_CREATOR, CommonData(
+                            R.string.provisioning_info_certs_issued,
+                            R.string.provisioning_info_description,
+                            it.toString()), id++)
+                }
+                info.manufacturer?.let {
+                    addItem(CommonItemViewHolder.COMMON_CREATOR, CommonData(
+                            R.string.provisioning_info_manufacturer,
+                            R.string.provisioning_info_description,
+                            it), id++)
+                }
+                info.validatedAttestedEntity?.let {
+                    addItem(CommonItemViewHolder.COMMON_CREATOR, CommonData(
+                            R.string.provisioning_info_attested_entity,
+                            R.string.provisioning_info_attested_entity_description,
+                            it), id++)
+                }
+                if (info.vbMetaDigest != null || info.vbMetaApproval != null) {
+                    addItem(CommonItemViewHolder.COMMON_CREATOR, ApprovalItemData(
+                            R.string.provisioning_info_vbmeta_digest,
+                            R.string.provisioning_info_vbmeta_digest_description,
+                            info.vbMetaDigest, info.vbMetaApproval), id++)
+                }
+                if (info.buildFingerprint != null || info.buildFingerprintApproval != null) {
+                    addItem(CommonItemViewHolder.COMMON_CREATOR, ApprovalItemData(
+                            R.string.provisioning_info_build_fingerprint,
+                            R.string.provisioning_info_build_fingerprint_description,
+                            info.buildFingerprint, info.buildFingerprintApproval), id++)
+                }
+                info.lostDevice?.let {
+                    addItem(CommonItemViewHolder.COMMON_CREATOR, CommonData(
+                            R.string.provisioning_info_lost_device,
+                            R.string.provisioning_info_lost_device_description,
+                            it.toString()), id++)
+                }
+            }
+        }
 
         id = ID_AUTHORIZATION_LIST_START
         addItem(SubtitleViewHolder.CREATOR, CommonData(
@@ -273,8 +324,9 @@ class HomeAdapter(listener: Listener) : IdBasedRecyclerViewAdapter() {
         private const val ID_CERT_INFO_START = 1000L
         private const val ID_RKP_HOSTNAME = 2000L
         private const val ID_DESCRIPTION_START = 3000L
-        private const val ID_AUTHORIZATION_LIST_START = 4000L
-        private const val ID_KNOX_START = 5000L
+        private const val ID_PROVISIONING_INFO_START = 4000L
+        private const val ID_AUTHORIZATION_LIST_START = 5000L
+        private const val ID_KNOX_START = 6000L
         private const val ID_ERROR_MESSAGE = 100000L
 
         private fun createAuthorizationItems(list: AuthorizationList): Array<String?> {

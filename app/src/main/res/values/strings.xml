@@ -51,8 +51,20 @@
     <string name="cert_error_sign">signature error: </string>
     <string name="cert_error_revoked">revoked: </string>
     <string name="cert_error_expired">expired: </string>
-    <string name="provisioning_info_certs_issued">number of certs issued in last 30 days: </string>
-    <string name="provisioning_info_manufacturer">manufacturer: </string>
+    <string name="provisioning_info">RKP provisioning info</string>
+    <string name="provisioning_info_description">Information from the remote key provisioning (RKP) certificate extension (OID 1.3.6.1.4.1.11129.2.1.30), including certificate issuance, manufacturer, attested entity, build metadata, and lost-device status when available.</string>
+    <string name="provisioning_info_certs_issued">Number of certs issued in last 30 days </string>
+    <string name="provisioning_info_manufacturer">Manufacturer </string>
+    <string name="provisioning_info_attested_entity">Validated attested entity</string>
+    <string name="provisioning_info_attested_entity_description">The certified origin of the attested key, such as TEE or STRONG_BOX.</string>
+    <string name="provisioning_info_vbmeta_digest">VBMeta digest</string>
+    <string name="provisioning_info_vbmeta_digest_description">The VBMeta digest recorded in the RKP certificate and its approval status.</string>
+    <string name="provisioning_info_build_fingerprint">Build fingerprint</string>
+    <string name="provisioning_info_build_fingerprint_description">The build fingerprint recorded in the RKP certificate and its approval status.</string>
+    <string name="provisioning_info_lost_device">Lost device</string>
+    <string name="provisioning_info_lost_device_description">Whether the provisioning server marked the device as reported lost when the certificate was issued.</string>
+    <string name="provisioning_info_approval_status">Approval status: %1$s</string>
+    <string name="provisioning_info_approval_unavailable">Unavailable</string>
 
     <string name="error_message_subtitle">Detailed messages:</string>
     <string name="error_unknown">Unknown error</string>

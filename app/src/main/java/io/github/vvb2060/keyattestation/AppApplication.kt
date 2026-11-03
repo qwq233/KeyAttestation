@@ -47,7 +47,8 @@ class AppApplication : Application() {
     private fun installProvider(context: Context) {
         if (BuildConfig.DEBUG) {
             Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME)
-            Security.insertProviderAt(BouncyCastleProvider(), 1)
+            // Keep platform X.509 parsing to preserve the original signed TBS encoding.
+            Security.addProvider(BouncyCastleProvider())
         } else runCatching {
             context.packageManager.getApplicationInfo("com.google.android.gms",
                     PackageManager.MATCH_SYSTEM_ONLY)

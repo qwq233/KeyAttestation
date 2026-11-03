@@ -49,8 +49,20 @@
     <string name="cert_error_sign">簽章錯誤：</string>
     <string name="cert_error_revoked">已註銷：</string>
     <string name="cert_error_expired">已過期：</string>
+    <string name="provisioning_info">RKP 佈建資訊</string>
+    <string name="provisioning_info_description">遠端金鑰配置（RKP）憑證擴充功能（OID 1.3.6.1.4.1.11129.2.1.30）中的資訊，包括擴充功能提供的憑證頒發數量、製造商、認證實體、建構資訊和遺失裝置標記。</string>
     <string name="provisioning_info_certs_issued">過去 30 天憑證頒發數量：</string>
     <string name="provisioning_info_manufacturer">製造商：</string>
+    <string name="provisioning_info_attested_entity">認證實體</string>
+    <string name="provisioning_info_attested_entity_description">經認證的金鑰來源，例如 TEE 或 STRONG_BOX。</string>
+    <string name="provisioning_info_vbmeta_digest">VBMeta 摘要</string>
+    <string name="provisioning_info_vbmeta_digest_description">RKP 憑證中記錄的 VBMeta 摘要及其核准狀態。</string>
+    <string name="provisioning_info_build_fingerprint">建構指紋</string>
+    <string name="provisioning_info_build_fingerprint_description">RKP 憑證中記錄的建構指紋及其核准狀態。</string>
+    <string name="provisioning_info_lost_device">遺失裝置標記</string>
+    <string name="provisioning_info_lost_device_description">憑證頒發時，佈建伺服器是否將裝置標記為已回報遺失。</string>
+    <string name="provisioning_info_approval_status">核准狀態：%1$s</string>
+    <string name="provisioning_info_approval_unavailable">未提供</string>
 
     <string name="error_message_subtitle">詳細資訊：</string>
     <string name="error_unknown">未知錯誤</string>

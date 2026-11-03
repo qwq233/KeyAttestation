@@ -3,6 +3,7 @@ package io.github.vvb2060.keyattestation.home
 import android.content.Context
 import android.util.Pair
 import android.view.View
+import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import io.github.vvb2060.keyattestation.AppApplication
 import io.github.vvb2060.keyattestation.R
@@ -71,6 +72,7 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
                 init {
                     this.binding.apply {
                         icon.isVisible = false
+                        icon.background = null
                         root.setOnClickListener {
                             listener.onCommonDataClick(data)
                         }
@@ -78,12 +80,30 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
                 }
 
                 override fun onBind() {
+                    val approval = data as? ApprovalItemData
                     binding.title.setText(data.title)
-                    if (data.data.isNullOrEmpty()) {
+                    if (approval != null) {
+                        binding.summary.text = approval.getMessage(itemView.context)
+                    } else if (data.data.isNullOrEmpty()) {
                         binding.summary.setText(R.string.empty)
                     } else {
                         binding.summary.text = data.data
                     }
+                    binding.icon.apply {
+                        isVisible = approval != null
+                        if (approval != null) {
+                            setImageResource(if (approval.isApproved) R.drawable.ic_trustworthy_24
+                                    else R.drawable.ic_warning_24)
+                            imageTintList = context.theme.resolveColorStateList(
+                                if (approval.isApproved) rikka.material.R.attr.colorSafe
+                                else rikka.material.R.attr.colorWarning)
+                        } else {
+                            setImageDrawable(null)
+                            imageTintList = null
+                        }
+                    }
+                    ViewCompat.setStateDescription(binding.root,
+                        approval?.getApprovalDescription(itemView.context))
                 }
             }
         }
@@ -163,7 +183,10 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
             }
         }
 
-        val CERT_INFO_CREATOR = Creator<CertificateInfo> { inflater, parent ->
+        val CERT_INFO_CREATOR = createCertInfoCreator(true)
+        val ATTESTATION_CERT_INFO_CREATOR = createCertInfoCreator(false)
+
+        private fun createCertInfoCreator(showProvisioningInfo: Boolean) = Creator<CertificateInfo> { inflater, parent ->
             val binding = HomeCommonItemBinding.inflate(inflater, parent, false)
             object : CommonItemViewHolder<CertificateInfo>(binding.root, binding) {
 
@@ -239,7 +262,7 @@ open class CommonItemViewHolder<T>(itemView: View, binding: HomeCommonItemBindin
                         sb.append(AuthorizationList.formatDate(cert.notAfter))
                     }
 
-                    data.provisioningInfo?.apply {
+                    data.provisioningInfo?.takeIf { showProvisioningInfo }?.apply {
                         certsIssued?.let {
                             sb.append("\n")
                                 .append(res.getString(R.string.provisioning_info_certs_issued))

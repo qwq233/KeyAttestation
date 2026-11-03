@@ -12,11 +12,34 @@ abstract class Data {
         context.getString(description).toHtml(HtmlCompat.FROM_HTML_OPTION_TRIM_WHITESPACE)
 }
 
-class CommonData(
+open class CommonData(
     override val title: Int,
     override val description: Int,
     val data: String? = null
 ) : Data()
+
+class ApprovalItemData(
+    title: Int,
+    description: Int,
+    data: String?,
+    val approvalStatus: String?
+) : CommonData(title, description, data) {
+    val isApproved: Boolean get() = approvalStatus == "APPROVED"
+
+    fun getApprovalDescription(context: Context): String = context.getString(
+        R.string.provisioning_info_approval_status,
+        approvalStatus?.ifEmpty { context.getString(R.string.empty) }
+            ?: context.getString(R.string.provisioning_info_approval_unavailable)
+    )
+
+    override fun getMessage(context: Context): CharSequence {
+        val empty = context.getString(R.string.empty)
+        val value = data?.ifEmpty { empty } ?: empty
+        val status = approvalStatus?.ifEmpty { empty }
+            ?: context.getString(R.string.provisioning_info_approval_unavailable)
+        return "$value \u00b7 $status"
+    }
+}
 
 class StringData(
     override val title: Int,

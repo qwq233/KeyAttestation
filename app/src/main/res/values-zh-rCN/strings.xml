@@ -50,8 +50,20 @@
     <string name="cert_error_sign">签名错误：</string>
     <string name="cert_error_revoked">已吊销：</string>
     <string name="cert_error_expired">已过期：</string>
+    <string name="provisioning_info">RKP 配置信息</string>
+    <string name="provisioning_info_description">远程密钥配置（RKP）证书扩展（OID 1.3.6.1.4.1.11129.2.1.30）中的信息，包括扩展提供的证书颁发数量、制造商、认证实体、构建信息和丢失设备标记。</string>
     <string name="provisioning_info_certs_issued">过去 30 天证书颁发数量：</string>
     <string name="provisioning_info_manufacturer">制造商：</string>
+    <string name="provisioning_info_attested_entity">认证实体</string>
+    <string name="provisioning_info_attested_entity_description">经认证的密钥来源，例如 TEE 或 STRONG_BOX。</string>
+    <string name="provisioning_info_vbmeta_digest">VBMeta 摘要</string>
+    <string name="provisioning_info_vbmeta_digest_description">RKP 证书中记录的 VBMeta 摘要及其批准状态。</string>
+    <string name="provisioning_info_build_fingerprint">构建指纹</string>
+    <string name="provisioning_info_build_fingerprint_description">RKP 证书中记录的构建指纹及其批准状态。</string>
+    <string name="provisioning_info_lost_device">丢失设备标记</string>
+    <string name="provisioning_info_lost_device_description">证书颁发时，配置服务器是否将设备标记为已报告丢失。</string>
+    <string name="provisioning_info_approval_status">批准状态：%1$s</string>
+    <string name="provisioning_info_approval_unavailable">未提供</string>
 
     <string name="error_message_subtitle">详细信息：</string>
     <string name="error_unknown">未知错误</string>
